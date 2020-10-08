@@ -1,80 +1,121 @@
-# df_maze.py
 import random
 
-# Create a maze using the depth-first algorithm described at                    
-# https://scipython.com/blog/making-a-maze/                                     
-# Christian Hill, April 2017.
+# https://scipython.com/blog/making-a-maze/
 
-class Cell:
-    """A cell in the maze.
+class Room:
+    """Room in the maze that is surrounded by walls - north, east, south, west."""
 
-    A maze "Cell" is a point in the grid which may be surrounded by walls to
-    the north, east, south or west.
-
-    """
-
-    # A wall separates a pair of cells in the N-S or W-E directions.
+    # A wall separates a pair of rooms in the N-S or W-E directions.
     wall_pairs = {'N': 'S', 'S': 'N', 'E': 'W', 'W': 'E'}
 
     def __init__(self, x, y):
-        """Initialize the cell at (x,y). At first it is surrounded by walls."""
+        """Initialize room with all four walls"""
 
-        self.x, self.y = x, y
+        self.x = x
+        self.y = y
         self.walls = {'N': True, 'S': True, 'E': True, 'W': True}
 
-    def has_all_walls(self):
-        """Does this cell still have all its walls?"""
+    def has_all_walls(self) -> bool:
+        """Does this room have all walls?"""
 
         return all(self.walls.values())
 
-    def knock_down_wall(self, other, wall):
-        """Knock down the wall between cells self and other."""
+    def destroy_wall(self, other, wall):
+        """Destroy the wall between rooms self and other."""
 
         self.walls[wall] = False
-        other.walls[Cell.wall_pairs[wall]] = False
+        other.walls[Room.wall_pairs[wall]] = False
+
 
 class Maze:
-    """A Maze, represented as a grid of cells."""
+    """Maze represented as a grid of cells."""
 
     def __init__(self, nx, ny, ix=0, iy=0):
-        """Initialize the maze grid.
-        The maze consists of nx x ny cells and will be constructed starting
-        at the cell indexed at (ix, iy).
-
+        """Initialize maze grid.
+        The maze consists of nx * ny cells
+        and will be constructed starting at the cell indexed (ix, iy).
         """
 
-        self.nx, self.ny = nx, ny
-        self.ix, self.iy = ix, iy
-        self.maze_map = [[Cell(x, y) for y in range(ny)] for x in range(nx)]
+        self.nx = nx
+        self.ny = ny
+        self.ix = ix
+        self.iy = iy
+        self.maze_map = [[Room(x, y) for y in range(ny)] for x in range(nx)]
 
-    def cell_at(self, x, y):
-        """Return the Cell object at (x,y)."""
+    def room_at(self, x, y) -> Room:
+        """Return Room object at (x, y)."""
 
         return self.maze_map[x][y]
 
-    def __str__(self):
-        """Return a (crude) string representation of the maze."""
+    def __str__(self) -> str:
+        """Return the maze as a string"""
 
-        maze_rows = ['-' * nx*2]
-        for y in range(ny):
+        maze_rows = ['-' * self.nx * 2]
+        for y in range(self.ny):
             maze_row = ['|']
-            for x in range(nx):
+            for x in range(self.nx):
                 if self.maze_map[x][y].walls['E']:
                     maze_row.append(' |')
                 else:
                     maze_row.append('  ')
             maze_rows.append(''.join(maze_row))
             maze_row = ['|']
-            for x in range(nx):
+            for x in range(self.nx):
                 if self.maze_map[x][y].walls['S']:
                     maze_row.append('-+')
                 else:
                     maze_row.append(' +')
             maze_rows.append(''.join(maze_row))
+
         return '\n'.join(maze_rows)
 
+    def find_valid_neighbours(self, room) -> list:
+        """Return a list of unvisited neighbours of room."""
+
+        directions = [('W', (-1, 0)), ('E', (1, 0)), ('S', (0, 1)), ('N', (0, -1))]
+        neighbours = []
+        for direction, (dx, dy) in directions:
+            x2 = room.x + dx
+            y2 = room.y + dy
+
+            if (0 <= x2 < self.nx) and (0 <= y2 < self.ny):
+                neighbour = self.room_at(x2, y2)
+                if neighbour.has_all_walls():
+                    neighbours.append((direction, neighbour))
+
+        return neighbours
+
+    def make_maze(self):
+        """Builds maze."""
+
+        total_rooms = self.nx * self.ny
+        total_visited_rooms = 1
+        rooms_stack = []
+        current_room = self.room_at(self.ix, self.iy)
+
+        while total_visited_rooms < total_rooms:
+            neighbours = self.find_valid_neighbours(current_room)
+
+            if not neighbours:
+                # Moving back
+                current_room = rooms_stack.pop()
+                continue
+
+            # Choose a random neighbouring room and go there.
+            direction, next_room = random.choice(neighbours)
+            current_room.destroy_wall(next_room, direction)
+            rooms_stack.append(current_room)
+            current_room = next_room
+            total_visited_rooms += 1
+
+    def write_txt(self, filename):
+        """Write maze as a string to txt file."""
+
+        with open(filename, 'w') as file:
+            print(self, file=file)
+
     def write_svg(self, filename):
-        """Write an SVG image of the maze to filename."""
+        """Write maze as an SVG image to file."""
 
         aspect_ratio = self.nx / self.ny
         # Pad the maze all around by this amount.
@@ -83,95 +124,59 @@ class Maze:
         height = 500
         width = int(height * aspect_ratio)
         # Scaling factors mapping maze coordinates to image coordinates
-        scy, scx = height / ny, width / nx
+        scy = height / self.ny
+        scx = width / self.nx
 
-        def write_wall(f, x1, y1, x2, y2):
-            """Write a single wall to the SVG image file handle f."""
+        def write_wall(file, x1, y1, x2, y2):
+            """Write a single wall to the SVG image file."""
 
-            print('<line x1="{}" y1="{}" x2="{}" y2="{}"/>'
-                                .format(x1, y1, x2, y2), file=f)
+            print(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}"/>', file=file)
 
         # Write the SVG image file for maze
-        with open(filename, 'w') as f:
-            # SVG preamble and styles.
-            print('<?xml version="1.0" encoding="utf-8"?>', file=f)
-            print('<svg xmlns="http://www.w3.org/2000/svg"', file=f)
-            print('    xmlns:xlink="http://www.w3.org/1999/xlink"', file=f)
+        with open(filename, 'w') as file:
+            # SVG header and styles.
+            print('<?xml version="1.0" encoding="utf-8"?>', file=file)
+            print('<svg xmlns="http://www.w3.org/2000/svg"', file=file)
+            print('    xmlns:xlink="http://www.w3.org/1999/xlink"', file=file)
             print('    width="{:d}" height="{:d}" viewBox="{} {} {} {}">'
-                    .format(width+2*padding, height+2*padding,
-                        -padding, -padding, width+2*padding, height+2*padding),
-                  file=f)
-            print('<defs>\n<style type="text/css"><![CDATA[', file=f)
-            print('line {', file=f)
-            print('    stroke: #000000;\n    stroke-linecap: square;', file=f)
-            print('    stroke-width: 5;\n}', file=f)
-            print(']]></style>\n</defs>', file=f)
-            # Draw the "South" and "East" walls of each cell, if present (these
-            # are the "North" and "West" walls of a neighbouring cell in
-            # general, of course).
-            for x in range(nx):
-                for y in range(ny):
-                    if maze.cell_at(x,y).walls['S']:
-                        x1, y1, x2, y2 = x*scx, (y+1)*scy, (x+1)*scx, (y+1)*scy
-                        write_wall(f, x1, y1, x2, y2)
-                    if maze.cell_at(x,y).walls['E']:
-                        x1, y1, x2, y2 = (x+1)*scx, y*scy, (x+1)*scx, (y+1)*scy
-                        write_wall(f, x1, y1, x2, y2)
-            # Draw the North and West maze border, which won't have been drawn
-            # by the procedure above. 
-            print('<line x1="0" y1="0" x2="{}" y2="0"/>'.format(width), file=f)
-            print('<line x1="0" y1="0" x2="0" y2="{}"/>'.format(height),file=f)
-            print('</svg>', file=f)
+                  .format(width + 2 * padding, height + 2 * padding, -padding, -padding, width + 2 * padding,
+                          height + 2 * padding),
+                  file=file)
+            print('<defs>\n<style type="text/css"><![CDATA[', file=file)
+            print('line {', file=file)
+            print('    stroke: #000000;\n    stroke-linecap: square;', file=file)
+            print('    stroke-width: 5;\n}', file=file)
+            print(']]></style>\n</defs>', file=file)
+            # Draw the "South" and "East" walls of each room if present
+            # (these are the "North" and "West" walls of a neighbouring room).
+            for x in range(self.nx):
+                for y in range(self.ny):
+                    if self.room_at(x, y).walls['S']:
+                        x1, y1, x2, y2 = x * scx, (y + 1) * scy, (x + 1) * scx, (y + 1) * scy
+                        write_wall(file, x1, y1, x2, y2)
+                    if self.room_at(x, y).walls['E']:
+                        x1, y1, x2, y2 = (x + 1) * scx, y * scy, (x + 1) * scx, (y + 1) * scy
+                        write_wall(file, x1, y1, x2, y2)
+            # Draw the North and West maze border, which won't have been drawn above.
+            print(f'<line x1="0" y1="0" x2="{width}" y2="0"/>', file=file)
+            print(f'<line x1="0" y1="0" x2="0" y2="{height}"/>', file=file)
+            print('</svg>', file=file)
 
-    def find_valid_neighbours(self, cell):
-        """Return a list of unvisited neighbours to cell."""
 
-        delta = [('W', (-1,0)),
-                 ('E', (1,0)),
-                 ('S', (0,1)),
-                 ('N', (0,-1))]
-        neighbours = []
-        for direction, (dx,dy) in delta:
-            x2, y2 = cell.x + dx, cell.y + dy
-            if (0 <= x2 < nx) and (0 <= y2 < ny):
-                neighbour = maze.cell_at(x2, y2)
-                if neighbour.has_all_walls():
-                    neighbours.append((direction, neighbour))
-        return neighbours
+def main():
+    filename = input('filename >>>')
+    nx = int(input('maze dimension x>>>'))
+    ny = int(input('maze dimension y>>>'))
+    ix = int(input('entry point x>>>'))
+    iy = int(input('entry point y>>>'))
 
-    def make_maze(self):
-        # Total number of cells.
-        n = self.nx * self.ny
-        cell_stack = []
-        current_cell = self.cell_at(ix, iy)
-        # Total number of visited cells during maze construction.
-        nv = 1
+    maze = Maze(nx, ny, ix, iy)
+    maze.make_maze()
 
-        while nv < n:
-            neighbours = self.find_valid_neighbours(current_cell)
+    maze.write_svg(filename + '.svg')
+    maze.write_txt(filename + '.txt')
+    print(maze)
 
-            if not neighbours:
-                # We've reached a dead end: backtrack.
-                current_cell = cell_stack.pop()
-                continue
 
-            # Choose a random neighbouring cell and move to it.
-            direction, next_cell = random.choice(neighbours)
-            current_cell.knock_down_wall(next_cell, direction)
-            cell_stack.append(current_cell)
-            current_cell = next_cell
-            nv += 1
-
-# Maze dimensions (ncols, nrows)
-nx, ny = 10, 10
-# Maze entry position
-ix, iy = 0, 0
-
-maze = Maze(nx, ny, ix, iy)
-maze.make_maze()
-
-print(maze)  
-maze.write_svg('maze_small.svg')
-with open('maze_small.txt', 'w') as file:
-    file.write(maze.__str__())
-
+if __name__ == "__main__":
+    main()
