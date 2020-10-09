@@ -1,4 +1,6 @@
 import random
+import time
+from os import system
 
 
 class Room:
@@ -29,10 +31,12 @@ class Room:
 class Maze:
     """Maze represented as a grid of cells."""
 
+    DIRECTIONS = {'W': (-1, 0), 'E': (1, 0), 'S': (0, 1), 'N': (0, -1)}
+
     def __init__(self, width, height, start_x=0, start_y=0):
         """Initialize maze grid.
-        The maze consists of nx * ny cells
-        and will be constructed starting at the cell indexed (ix, iy).
+        The maze consists of width * height cells
+        and will be constructed starting at the cell indexed (start_x, start_y).
         """
 
         self.width = width
@@ -71,9 +75,8 @@ class Maze:
     def find_valid_neighbours(self, room) -> list:
         """Return a list of unvisited neighbours of room."""
 
-        directions = [('W', (-1, 0)), ('E', (1, 0)), ('S', (0, 1)), ('N', (0, -1))]
         neighbours = []
-        for direction, (dx, dy) in directions:
+        for direction, (dx, dy) in self.DIRECTIONS.items():
             x2 = room.x + dx
             y2 = room.y + dy
 
@@ -84,7 +87,7 @@ class Maze:
 
         return neighbours
 
-    def make_maze(self):
+    def make_maze(self, visualize=False):
         """Builds maze."""
 
         total_rooms = self.width * self.height
@@ -107,6 +110,12 @@ class Maze:
             current_room = next_room
             total_visited_rooms += 1
 
+            if visualize:
+                # Visualizing maze generation process
+                system('clear')
+                print(maze)
+                time.sleep(1)
+
     def write_txt(self, filename):
         """Write maze as a string to txt file."""
 
@@ -123,8 +132,8 @@ class Maze:
         height = 500
         width = int(height * aspect_ratio)
         # Scaling factors mapping maze coordinates to image coordinates
-        scy = height / self.height
-        scx = width / self.width
+        scale_y = height / self.height
+        scale_x = width / self.width
 
         def write_wall(file, x1, y1, x2, y2):
             """Write a single wall to the SVG image file."""
@@ -151,10 +160,10 @@ class Maze:
             for x in range(self.width):
                 for y in range(self.height):
                     if self.room_at(x, y).walls['S']:
-                        x1, y1, x2, y2 = x * scx, (y + 1) * scy, (x + 1) * scx, (y + 1) * scy
+                        x1, y1, x2, y2 = x * scale_x, (y + 1) * scale_y, (x + 1) * scale_x, (y + 1) * scale_y
                         write_wall(file, x1, y1, x2, y2)
                     if self.room_at(x, y).walls['E']:
-                        x1, y1, x2, y2 = (x + 1) * scx, y * scy, (x + 1) * scx, (y + 1) * scy
+                        x1, y1, x2, y2 = (x + 1) * scale_x, y * scale_y, (x + 1) * scale_x, (y + 1) * scale_y
                         write_wall(file, x1, y1, x2, y2)
             # Draw the North and West maze border, which won't have been drawn above.
             print(f'<line x1="0" y1="0" x2="{width}" y2="0"/>', file=file)
@@ -162,7 +171,7 @@ class Maze:
             print('</svg>', file=file)
 
 
-def main():
+if __name__ == "__main__":
     filename = input('filename >>>')
     nx = int(input('maze dimension x>>>'))
     ny = int(input('maze dimension y>>>'))
@@ -175,7 +184,3 @@ def main():
     maze.write_svg(filename + '.svg')
     maze.write_txt(filename + '.txt')
     print(maze)
-
-
-if __name__ == "__main__":
-    main()
