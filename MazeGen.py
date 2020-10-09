@@ -1,6 +1,5 @@
 import random
 
-# https://scipython.com/blog/making-a-maze/
 
 class Room:
     """Room in the maze that is surrounded by walls - north, east, south, west."""
@@ -30,17 +29,17 @@ class Room:
 class Maze:
     """Maze represented as a grid of cells."""
 
-    def __init__(self, nx, ny, ix=0, iy=0):
+    def __init__(self, width, height, start_x=0, start_y=0):
         """Initialize maze grid.
         The maze consists of nx * ny cells
         and will be constructed starting at the cell indexed (ix, iy).
         """
 
-        self.nx = nx
-        self.ny = ny
-        self.ix = ix
-        self.iy = iy
-        self.maze_map = [[Room(x, y) for y in range(ny)] for x in range(nx)]
+        self.width = width
+        self.height = height
+        self.start_x = start_x
+        self.start_y = start_y
+        self.maze_map = [[Room(x, y) for y in range(height)] for x in range(width)]
 
     def room_at(self, x, y) -> Room:
         """Return Room object at (x, y)."""
@@ -50,17 +49,17 @@ class Maze:
     def __str__(self) -> str:
         """Return the maze as a string"""
 
-        maze_rows = ['-' * self.nx * 2]
-        for y in range(self.ny):
+        maze_rows = ['-' * self.width * 2]
+        for y in range(self.height):
             maze_row = ['|']
-            for x in range(self.nx):
+            for x in range(self.width):
                 if self.maze_map[x][y].walls['E']:
                     maze_row.append(' |')
                 else:
                     maze_row.append('  ')
             maze_rows.append(''.join(maze_row))
             maze_row = ['|']
-            for x in range(self.nx):
+            for x in range(self.width):
                 if self.maze_map[x][y].walls['S']:
                     maze_row.append('-+')
                 else:
@@ -78,7 +77,7 @@ class Maze:
             x2 = room.x + dx
             y2 = room.y + dy
 
-            if (0 <= x2 < self.nx) and (0 <= y2 < self.ny):
+            if (0 <= x2 < self.width) and (0 <= y2 < self.height):
                 neighbour = self.room_at(x2, y2)
                 if neighbour.has_all_walls():
                     neighbours.append((direction, neighbour))
@@ -88,10 +87,10 @@ class Maze:
     def make_maze(self):
         """Builds maze."""
 
-        total_rooms = self.nx * self.ny
+        total_rooms = self.width * self.height
         total_visited_rooms = 1
         rooms_stack = []
-        current_room = self.room_at(self.ix, self.iy)
+        current_room = self.room_at(self.start_x, self.start_y)
 
         while total_visited_rooms < total_rooms:
             neighbours = self.find_valid_neighbours(current_room)
@@ -117,15 +116,15 @@ class Maze:
     def write_svg(self, filename):
         """Write maze as an SVG image to file."""
 
-        aspect_ratio = self.nx / self.ny
+        aspect_ratio = self.width / self.height
         # Pad the maze all around by this amount.
         padding = 10
         # Height and width of the maze image (excluding padding), in pixels
         height = 500
         width = int(height * aspect_ratio)
         # Scaling factors mapping maze coordinates to image coordinates
-        scy = height / self.ny
-        scx = width / self.nx
+        scy = height / self.height
+        scx = width / self.width
 
         def write_wall(file, x1, y1, x2, y2):
             """Write a single wall to the SVG image file."""
@@ -149,8 +148,8 @@ class Maze:
             print(']]></style>\n</defs>', file=file)
             # Draw the "South" and "East" walls of each room if present
             # (these are the "North" and "West" walls of a neighbouring room).
-            for x in range(self.nx):
-                for y in range(self.ny):
+            for x in range(self.width):
+                for y in range(self.height):
                     if self.room_at(x, y).walls['S']:
                         x1, y1, x2, y2 = x * scx, (y + 1) * scy, (x + 1) * scx, (y + 1) * scy
                         write_wall(file, x1, y1, x2, y2)
